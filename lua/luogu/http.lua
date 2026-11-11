@@ -93,10 +93,19 @@ function M.request(opts, cb)
     "\n%{http_code}",
   }
 
-  local cookie = opts.cookie
-  if cookie and cookie ~= "" then
-    args[#args + 1] = "-b"
-    args[#args + 1] = cookie
+  -- -b "" turns on curl's cookie engine, so the WAF redirect cookie is carried
+  -- on the follow-up request. Set-Cookie is only needed for GETs.
+  args[#args + 1] = "-b"
+  if opts.cookie and opts.cookie ~= "" then
+    args[#args + 1] = opts.cookie
+  else
+    args[#args + 1] = ""
+  end
+
+  if opts.method ~= "POST" then
+    args[#args + 1] = "-L"
+    args[#args + 1] = "--max-redirs"
+    args[#args + 1] = "3"
   end
 
   local headers = opts.headers or {}
