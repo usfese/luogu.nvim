@@ -3,12 +3,13 @@ local M = {}
 local api = require("luogu.api")
 local config = require("luogu.config")
 local status = require("luogu.status")
+local kit = require("luogu.ui.kit")
 
 local LOG = vim.log.levels
 
-local NAME_W = 40
-local DIFF_W = 14
-local TAG_W = 20
+local PID_W = 7
+local DIFF_W = 13
+local RATE_W = 6
 
 local state = {
   buf = nil,
@@ -26,35 +27,6 @@ local state = {
   ns = vim.api.nvim_create_namespace("luogu.list"),
 }
 
-local function dwidth(s)
-  return vim.fn.strdisplaywidth(s)
-end
-
---- Truncate to `width` display cells, appending an ellipsis when cut.
-local function fit(s, width)
-  s = s or ""
-  if width <= 0 then
-    return ""
-  end
-  if dwidth(s) <= width then
-    return s
-  end
-  local ellipsis = "…"
-  local budget = width - dwidth(ellipsis)
-  local out = {}
-  local used = 0
-  for i = 0, vim.fn.strchars(s) - 1 do
-    local ch = vim.fn.strcharpart(s, i, 1)
-    local w = dwidth(ch)
-    if used + w > budget then
-      break
-    end
-    out[#out + 1] = ch
-    used = used + w
-  end
-  return table.concat(out) .. ellipsis
-end
-
 local function tag_name(id)
   if state.tags and state.tags.by_id and state.tags.by_id[id] then
     return state.tags.by_id[id].name
@@ -65,42 +37,37 @@ end
 local function rate_text(p)
   local submit = tonumber(p.total_submit) or 0
   local accepted = tonumber(p.total_accepted) or 0
-  return ("%5.1f%%"):format(accepted / math.max(submit, 1) * 100)
+  return ("%.1f%%"):format(accepted / math.max(submit, 1) * 100)
+end
+
+local function layout_width()
+  if state.win and vim.api.nvim_win_is_valid(state.win) then
+    return vim.api.nvim_win_get_width(state.win)
+  end
+  return vim.o.columns
 end
 
 --- Build one list row plus its highlight marks (byte columns).
-local function build_row(problem)
-  local parts = {}
-  local marks = {}
-  local col = 0
-
-  local function push(s)
-    parts[#parts + 1] = s
-    col = col + #s
-  end
-
-  local function mark(s, hl)
-    local start_col = col
-    push(s)
-    marks[#marks + 1] = { start_col = start_col, end_col = col, hl = hl }
-  end
+---@param problem table
+---@param name_w integer
+---@param tag_w integer
+---@return table kit line
+local function build_row(problem, name_w, tag_w)
+  local line = kit.line()
 
   local pid = tostring(problem.pid or "?")
-  mark(pid, "LuoguPid")
-  push((" "):rep(math.max(1, 7 - #pid)))
+  line:add(pid, "LuoguPid")
+  line:add((" "):rep(math.max(1, PID_W - #pid)))
 
-  local name = fit(problem.name or "", NAME_W)
-  push(name)
-  push((" "):rep(NAME_W - dwidth(name)))
-  push(" ")
+  line:add(kit.pad(kit.fit(problem.name or "", name_w), name_w))
+  line:add(" ")
 
-  local diff = fit(status.difficulty(problem.difficulty), DIFF_W)
-  mark(diff, status.difficulty_hl(problem.difficulty))
-  push((" "):rep(DIFF_W - dwidth(diff)))
-  push(" ")
+  local diff = kit.fit(status.difficulty(problem.difficulty), DIFF_W)
+  line:add(diff, status.difficulty_hl(problem.difficulty))
+  line:add((" "):rep(math.max(0, DIFF_W - kit.width(diff))))
+  line:add(" ")
 
-  push(rate_text(problem))
-  push("  ")
+  line:add(kit.right(rate_text(problem), RATE_W), "LuoguAlt")
 
   local names = {}
   for _, id in ipairs(problem.tags or {}) do
@@ -109,12 +76,13 @@ local function build_row(problem)
     end
     names[#names + 1] = tag_name(id)
   end
-  local tags = fit(table.concat(names, ","), TAG_W)
+  local tags = kit.fit(table.concat(names, ", "), tag_w)
   if tags ~= "" then
-    mark("[" .. tags .. "]", "LuoguMuted")
+    line:add("  ")
+    line:add(tags, "LuoguMuted")
   end
 
-  return table.concat(parts), marks
+  return line
 end
 
 function M.render()
@@ -127,55 +95,114 @@ function M.render()
   local marks = {}
   local data = state.data
   local count = data and data.count or 0
+  local per_page = math.max(data and data.perPage or 50, 1)
+  local pages = math.max(1, math.ceil(count / per_page))
+  local width = layout_width()
 
-  if data then
-    lines[#lines + 1] = ("Luogu 题库 · %d 题 · 第 %d 页"):format(count, state.page)
-  else
-    lines[#lines + 1] = "Luogu 题库"
+  local function push(line)
+    local row = #lines
+    lines[row + 1] = line.text
+    for _, mark in ipairs(line.marks) do
+      marks[#marks + 1] = { row = row, start_col = mark.start_col, end_col = mark.end_col, hl = mark.hl }
+    end
+    return row
   end
 
-  local diff_label = state.difficulty ~= nil and status.difficulty(state.difficulty) or "全部难度"
+  local function push_text(text)
+    push(kit.line():add(text))
+  end
+
+  for _, logo_line in ipairs(kit.logo) do
+    push(kit.line():add(logo_line, "LuoguLogo"))
+  end
+  push_text("")
+
+  push(
+    kit
+      .line()
+      :add("Menu", "LuoguMuted")
+      :add(" " .. kit.icons.caret .. " ", "LuoguMuted")
+      :add("Problems", "LuoguTitle")
+  )
+  push_text("")
+
+  local diff_label = state.difficulty ~= nil and status.difficulty(state.difficulty) or "全部"
   local keyword = state.keyword and state.keyword ~= "" and state.keyword or "无"
-  lines[#lines + 1] = ("筛选: %s   搜索: %s   (q 关闭, / 搜索, d 难度, n/p 翻页, r 刷新)"):format(diff_label, keyword)
-  lines[#lines + 1] = ("-"):rep(80)
+  local signed_in = require("luogu.auth").get_cookie() ~= ""
+
+  local stats = kit.line()
+  stats:add(kit.bar .. " ", "LuoguMuted")
+  stats:add("难度 " .. diff_label, "LuoguAlt")
+  stats:add(" " .. kit.bar .. " ", "LuoguMuted")
+  stats:add("搜索 " .. keyword, "LuoguAlt")
+  stats:add(" " .. kit.bar .. " ", "LuoguMuted")
+  if signed_in then
+    stats:add(kit.icons.ac .. " 已登录", "LuoguOk")
+  else
+    stats:add(kit.icons.todo .. " 未登录", "LuoguMuted")
+  end
+  push(stats)
+  push_text("")
 
   state.row_to_problem = {}
+  local first_row = nil
+  local name_w = math.max(18, math.min(44, width - PID_W - DIFF_W - RATE_W - 26))
+  local tag_w = math.max(8, math.min(24, width - PID_W - name_w - DIFF_W - RATE_W - 12))
 
   if state.error then
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = "加载失败：" .. state.error
+    push(kit.line():add("加载失败：" .. state.error, "LuoguError"))
   elseif not data then
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = "加载中…"
+    push(kit.line():add("加载中…", "LuoguMuted"))
   elseif #data.result == 0 then
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = "没有找到题目"
+    push(kit.line():add("没有找到题目", "LuoguMuted"))
   else
     for _, problem in ipairs(data.result) do
-      local row = #lines
-      local line, row_marks = build_row(problem)
-      lines[#lines + 1] = line
-      state.row_to_problem[row] = problem
-      for _, m in ipairs(row_marks) do
-        marks[#marks + 1] = { row = row, start_col = m.start_col, end_col = m.end_col, hl = m.hl }
+      local row = push(build_row(problem, name_w, tag_w))
+      if not first_row then
+        first_row = row
       end
+      state.row_to_problem[row] = problem
     end
   end
+
+  push_text("")
+
+  local footer = kit.line()
+  footer:add(kit.bar .. " ", "LuoguMuted")
+  footer:add(("%d 题"):format(count), "LuoguAlt")
+  footer:add((" %s 第 %d/%d 页"):format(kit.bar, state.page, pages), "LuoguAlt")
+  footer:add((" %s %d 条"):format(kit.bar, #(data and data.result or {})), "LuoguAlt")
+  push(footer)
+
+  local hints = kit.line()
+  local function hint(key, desc)
+    if hints.text ~= "" then
+      hints:add("   ")
+    end
+    hints:add(key, "LuoguKey")
+    hints:add(" " .. desc, "LuoguMuted")
+  end
+  hint("q", "关闭")
+  hint("<CR>", "打开")
+  hint("/", "搜索")
+  hint("d", "难度")
+  hint("n/p", "翻页")
+  hint("r", "刷新")
+  push(hints)
 
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.api.nvim_buf_clear_namespace(buf, state.ns, 0, -1)
-  for _, m in ipairs(marks) do
-    pcall(vim.api.nvim_buf_set_extmark, buf, state.ns, m.row, m.start_col, {
-      end_col = m.end_col,
-      hl_group = m.hl,
+  for _, mark in ipairs(marks) do
+    pcall(vim.api.nvim_buf_set_extmark, buf, state.ns, mark.row, mark.start_col, {
+      end_col = mark.end_col,
+      hl_group = mark.hl,
     })
   end
   vim.bo[buf].modifiable = false
 
-  local win = state.win
-  if win and vim.api.nvim_win_is_valid(win) and #lines >= 4 and not state.error then
-    pcall(vim.api.nvim_win_set_cursor, win, { 4, 0 })
+  if first_row and state.win and vim.api.nvim_win_is_valid(state.win) then
+    pcall(vim.api.nvim_win_set_cursor, state.win, { first_row + 1, 0 })
   end
 end
 
@@ -364,6 +391,7 @@ function M.open()
   pcall(vim.api.nvim_set_option_value, "wrap", false, { win = state.win })
   pcall(vim.api.nvim_set_option_value, "number", false, { win = state.win })
   pcall(vim.api.nvim_set_option_value, "relativenumber", false, { win = state.win })
+  pcall(vim.api.nvim_set_option_value, "cursorline", true, { win = state.win })
 
   vim.api.nvim_create_autocmd("BufWipeout", {
     buffer = buf,

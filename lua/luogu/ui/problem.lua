@@ -72,13 +72,27 @@ local function set_desc_keymaps(buf, pid)
   end
 end
 
+local desc_ns = vim.api.nvim_create_namespace("luogu.desc")
+
+local function paint_desc(buf, problem, tags)
+  local doc = render.problem_document(problem, tags)
+  vim.bo[buf].modifiable = true
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, doc.lines)
+  vim.api.nvim_buf_clear_namespace(buf, desc_ns, 0, -1)
+  for _, mark in ipairs(doc.marks) do
+    pcall(vim.api.nvim_buf_set_extmark, buf, desc_ns, mark.row, mark.start_col, {
+      end_col = mark.end_col,
+      hl_group = mark.hl,
+    })
+  end
+  vim.bo[buf].modifiable = false
+end
+
 local function render_desc(buf, problem, tags)
   if not (buf and vim.api.nvim_buf_is_valid(buf)) then
     return
   end
-  vim.bo[buf].modifiable = true
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, render.problem_markdown(problem, tags))
-  vim.bo[buf].modifiable = false
+  paint_desc(buf, problem, tags)
 end
 
 local function create_desc(problem, tags)
@@ -87,8 +101,7 @@ local function create_desc(problem, tags)
   vim.bo[buf].swapfile = false
   vim.bo[buf].filetype = "markdown"
   vim.bo[buf].modifiable = true
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, render.problem_markdown(problem, tags))
-  vim.bo[buf].modifiable = false
+  paint_desc(buf, problem, tags)
   vim.b[buf].luogu_pid = problem.pid
   vim.b[buf].luogu_desc = true
   return buf
@@ -431,7 +444,8 @@ function M.pick_language(key)
   vim.ui.select(candidates, {
     prompt = "选择语言",
     format_item = function(lang)
-      return lang.name
+      local icon = require("luogu.ui.kit").devicon(lang.ext)
+      return icon and (icon .. " " .. lang.name) or lang.name
     end,
   }, choose)
 end

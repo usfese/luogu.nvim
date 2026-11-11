@@ -163,11 +163,12 @@ eq("difficulty highlight", status.difficulty_hl(8), "LuoguDiff8")
 -- render -------------------------------------------------------------
 local tags_by_id = { [1] = { name = "模拟" }, [2] = { name = "字符串" } }
 local md = table.concat(render.problem_markdown(problem, tags_by_id), "\n")
-contains("markdown title", md, "# P1001 A+B Problem")
-contains("markdown difficulty", md, "- **难度**：入门")
-contains("markdown tags", md, "- **标签**：模拟")
-contains("markdown pass rate", md, "- **通过**：")
-contains("markdown limits", md, "1000 ms / 512.0 MiB")
+contains("markdown title", md, "P1001. A+B Problem")
+contains("markdown difficulty", md, "入门")
+contains("markdown tags", md, "模拟")
+contains("markdown pass rate", md, "通过 ")
+contains("markdown time limit", md, "1000 ms")
+contains("markdown memory limit", md, "512.0 MiB")
 contains("markdown background", md, "## 题目背景")
 contains("markdown description", md, "## 题目描述")
 contains("markdown input", md, "## 输入格式")
@@ -179,12 +180,31 @@ contains("markdown sample output", md, "50")
 contains("markdown hint", md, "## 提示")
 contains("markdown unknown tag placeholder", table.concat(render.problem_markdown(problem, nil), "\n"), "#1")
 
+local kit = require("luogu.ui.kit")
+eq("kit pad cjk", kit.pad("中文", 6), "中文  ")
+eq("kit right", kit.right("7", 3), "  7")
+eq("kit fit truncates", kit.fit("abcdef", 4), "abc…")
+eq("kit fit keeps", kit.fit("ab", 4), "ab")
+eq("kit logo lines", #kit.logo, 5)
+
+local doc = render.problem_document(problem, tags_by_id)
+eq("doc url line", doc.lines[1], "luogu.com.cn/problem/P1001")
+eq("doc title line", doc.lines[2], "P1001. A+B Problem")
+local diff_mark
+for _, mark in ipairs(doc.marks) do
+  if mark.row == 2 and mark.hl == "LuoguDiff1" then
+    diff_mark = mark
+  end
+end
+ok("doc difficulty mark", diff_mark ~= nil)
+contains("doc meta bar", doc.lines[3], "│ 通过 57.9%")
+
 local bare = api.normalize_problem(
   vim.json.decode('{"data":{"problem":{"pid":"P1","name":"T","content":{"description":"body"}}}}')
 )
 local bare_md = table.concat(render.problem_markdown(bare, {}), "\n")
 ok("markdown omits empty hint", bare_md:find("## 提示", 1, true) == nil)
-contains("markdown empty tags", bare_md, "- **标签**：无")
+ok("markdown omits empty tag segment", bare_md:find("标签", 1, true) == nil)
 
 local two_tags = api.normalize_problem(
   vim.json.decode('{"data":{"problem":{"pid":"P2","name":"X","tags":[1,2],"content":{}}}}')
@@ -192,28 +212,35 @@ local two_tags = api.normalize_problem(
 contains(
   "markdown tags joined",
   table.concat(render.problem_markdown(two_tags, tags_by_id), "\n"),
-  "- **标签**：模拟、字符串"
+  "模拟、字符串"
 )
 
 local ac_lines = render.record_lines(ac)
 local ac_text = table.concat(ac_lines.lines, "\n")
 contains("record line accepted", ac_text, "Accepted")
+contains("record header icon", ac_text, "✓ Accepted")
 contains("record line short", ac_text, "(AC)")
-contains("record line score", ac_text, "得分 100")
+contains("record line score", ac_text, "100 分")
 contains("record line language", ac_text, "C++17")
-contains("record line subtask", ac_text, "子任务:")
-ok("record line marks", #ac_lines.marks >= 1 and ac_lines.marks[1].hl == "LuoguOk")
-eq("record mark row", ac_lines.marks[1].row, 0)
-eq("record mark start", ac_lines.lines[1]:sub(ac_lines.marks[1].start_col + 1, ac_lines.marks[1].end_col), "Accepted (AC)")
+contains("record line subtask", ac_text, "子任务")
+local token_mark
+for _, mark in ipairs(ac_lines.marks) do
+  local text = ac_lines.lines[mark.row + 1]:sub(mark.start_col + 1, mark.end_col)
+  if text == "Accepted (AC)" then
+    token_mark = mark
+  end
+end
+ok("record mark for status token", token_mark ~= nil and token_mark.hl == "LuoguOk")
+eq("record mark row", token_mark and token_mark.row, 0)
 
 local ce_text = table.concat(render.record_lines(ce).lines, "\n")
 ok("record ce strips ansi", ce_text:find("\27", 1, true) == nil)
 contains("record ce message", ce_text, "expected ';'")
-contains("record ce header", ce_text, "编译信息:")
+contains("record ce header", ce_text, "编译信息")
 
 local running_text = table.concat(render.record_lines({ rid = 1, status = 1, score = 0 }).lines, "\n")
 contains("record running", running_text, "评测中…")
-ok("record running hides subtasks", running_text:find("子任务:", 1, true) == nil)
+ok("record running hides subtasks", running_text:find("子任务", 1, true) == nil)
 
 local fence = render.fence_for("~~~\ninside\n")
 ok("fence grows", #fence >= 4)

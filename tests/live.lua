@@ -101,11 +101,21 @@ end, "list buffer with P1000")
 
 local list_buf = ui_list.state.buf
 local list_lines = vim.api.nvim_buf_get_lines(list_buf, 0, -1, false)
-if not list_lines[1]:find("题库", 1, true) then
-  fail("list header missing: " .. tostring(list_lines[1]))
+if not table.concat(list_lines, "\n"):find("Problems", 1, true) then
+  fail("list breadcrumb missing")
 end
-if not list_lines[4] or list_lines[4]:sub(1, 5) ~= "P1000" then
-  fail("first row is not P1000: " .. tostring(list_lines[4]))
+local row_index
+for i, line in ipairs(list_lines) do
+  if line:sub(1, 5) == "P1000" then
+    row_index = i
+    break
+  end
+end
+if not row_index then
+  fail("P1000 row missing from the list")
+end
+if row_index < 6 then
+  fail("P1000 row appeared before the header block")
 end
 if #vim.api.nvim_list_tabpages() ~= tabs_before + 1 then
   fail("list did not open in its own tab")
@@ -140,8 +150,11 @@ end
 if not desc_text:find("## 题目描述", 1, true) then
   fail("description buffer missing markdown section")
 end
-if desc_text:find("- **标签**：模拟", 1, true) == nil then
-  fail("description buffer did not resolve tag names")
+if desc_text:find("入门", 1, true) == nil or desc_text:find("模拟", 1, true) == nil then
+  fail("description header missing difficulty or tag name")
+end
+if desc_text:find("P1001. A+B Problem", 1, true) == nil then
+  fail("description header missing title")
 end
 
 local code_path = vim.api.nvim_buf_get_name(code_buf)
