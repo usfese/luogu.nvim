@@ -86,6 +86,33 @@ print("tags ok")
 local tabs_before = #vim.api.nvim_list_tabpages()
 local base_buf = vim.api.nvim_get_current_buf()
 
+-- seed the index instead of pulling all 335 pages in a test
+local cache = require("luogu.cache")
+if not cache.save({
+  version = cache.version,
+  updated_at = os.time(),
+  type = "P",
+  per_page = 20,
+  count = #list.result,
+  problems = list.result,
+}) then
+  fail("could not seed the problem cache")
+end
+
+local function problem_rows()
+  local n = 0
+  for _, row in pairs(ui_list.state.row_map) do
+    if row.kind == "problem" then
+      n = n + 1
+    end
+  end
+  return n
+end
+
+local function feed(keys)
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), "x", false)
+end
+
 ui_list.open("menu")
 if ui_list.state.view ~= "menu" then
   fail("menu page is not active")
@@ -125,8 +152,37 @@ local list_lines = vim.api.nvim_buf_get_lines(list_buf, 0, -1, false)
 if not table.concat(list_lines, "\n"):find("Problems", 1, true) then
   fail("list breadcrumb missing")
 end
+if problem_rows() ~= 20 then
+  fail(("page 1 should show 20 rows, got %d"):format(problem_rows()))
+end
+if not table.concat(list_lines, "\n"):find("第 1/3 页", 1, true) then
+  fail("page counter missing")
+end
 
-local data_before = ui_list.state.data
+feed("l")
+if ui_list.state.page ~= 2 or problem_rows() ~= 20 then
+  fail("l did not go to page 2")
+end
+feed("h")
+if ui_list.state.page ~= 1 then
+  fail("h did not go back to page 1")
+end
+ui_list.goto_page(3)
+if problem_rows() ~= 10 then
+  fail(("last page should show 10 rows, got %d"):format(problem_rows()))
+end
+ui_list.goto_page(1)
+
+ui_list.state.keyword = "P1001"
+ui_list.render()
+if problem_rows() ~= 1 then
+  fail(("keyword filter should keep 1 row, got %d"):format(problem_rows()))
+end
+ui_list.state.keyword = nil
+ui_list.render()
+print("paging ok")
+
+local all_before = ui_list.state.all
 ui_list.open_problem("P1001")
 
 local code_buf, desc_buf
@@ -178,7 +234,7 @@ vim.api.nvim_win_close(code_win, true)
 wait_for(function()
   return ui_list.state.win ~= nil and vim.api.nvim_win_is_valid(ui_list.state.win)
 end, "list restored after closing the problem")
-if ui_list.state.data ~= data_before then
+if ui_list.state.all ~= all_before then
   fail("list was refetched instead of reused")
 end
 if #vim.api.nvim_list_tabpages() ~= tabs_before + 1 then

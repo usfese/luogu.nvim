@@ -173,8 +173,10 @@ function M.json(opts, cb)
       return cb(nil, { msg = msg, status = res.status, body = res.body })
     end
     if res.body:match("^%s*<") then
+      local challenge = res.body:find("<script>var _%$", 1) ~= nil
       return cb(nil, {
-        msg = "洛谷接口变更：需要更新 luogu.nvim",
+        msg = challenge and "洛谷反爬校验：请求太快了，稍后再试"
+          or "洛谷接口变更：需要更新 luogu.nvim",
         status = res.status,
         body = res.body,
       })

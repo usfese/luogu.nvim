@@ -1,9 +1,9 @@
 local M = {}
 
 local LOG = vim.log.levels
-local USAGE = "用法: :Luogu [list|open <pid>|submit [pid]|lang [key]|login|logout|record <rid>]"
+local USAGE = "用法: :Luogu [list|open <pid>|submit [pid]|lang [key]|login|logout|record <rid>|sync]"
 
-local SUBCOMMANDS = { "list", "open", "submit", "lang", "login", "logout", "record" }
+local SUBCOMMANDS = { "list", "open", "submit", "lang", "login", "logout", "record", "sync" }
 
 local function err(msg)
   vim.notify(msg, LOG.ERROR)
@@ -38,6 +38,8 @@ function M.run(fargs)
       return err(USAGE)
     end
     return require("luogu.ui.result").open(fargs[2])
+  elseif sub == "sync" then
+    return require("luogu.ui.list").sync()
   end
 
   if sub:match("^[%w_]+$") then

@@ -55,6 +55,28 @@ eq(
 )
 eq("encode_query empty", http.encode_query({}), nil)
 
+-- http: HTML responses are classified, not swallowed
+do
+  local real = http.request
+  local data, err
+  http.request = function(_, cb)
+    cb({ status = 200, body = '<script>var _$x=["document"];' }, nil)
+  end
+  http.json({ path = "/x" }, function(d, e)
+    data, err = d, e
+  end)
+  ok("challenge detected", data == nil and err ~= nil and err.msg:find("反爬", 1, true) ~= nil)
+
+  http.request = function(_, cb)
+    cb({ status = 200, body = "<html>nope</html>" }, nil)
+  end
+  http.json({ path = "/x" }, function(d, e)
+    data, err = d, e
+  end)
+  ok("html flagged as api change", data == nil and err ~= nil and err.msg:find("接口变更", 1, true) ~= nil)
+  http.request = real
+end
+
 -- api ----------------------------------------------------------------
 local problem = api.normalize_problem(load_json("problem_p1001.json"))
 eq("problem pid", problem.pid, "P1001")
@@ -128,6 +150,91 @@ eq("normalize_tags types", #tags_payload.types, 4)
 local no_tags, no_tags_err = api.normalize_tags({ tags = vim.NIL })
 eq("normalize_tags missing payload", no_tags, nil)
 ok("normalize_tags error", no_tags_err ~= nil)
+
+-- latex --------------------------------------------------------------
+local latex = require("luogu.latex")
+eq("latex le", latex.clean("$a \\le b$"), "a ≤ b")
+eq("latex times", latex.clean("$a \\times b$"), "a × b")
+eq("latex text", latex.clean("$\\text{答案}$"), "答案")
+eq("latex frac", latex.clean("$\\frac{1}{2}$"), "1/2")
+eq("latex literal braces", latex.clean("$\\{1,2\\}$"), "{1,2}")
+eq("latex subscript", latex.clean("$a_{i}$"), "a_i")
+eq("latex unknown command", latex.clean("$\\foo$"), "foo")
+eq("latex entities", latex.clean("&lt;cstdio&gt; &amp; &#65;"), "<cstdio> & A")
+eq("latex outside math", latex.clean("100\\% 数据"), "100% 数据")
+eq("latex leaves code", latex.clean("`#include <cstdio>`"), "`#include <cstdio>`")
+
+-- cache --------------------------------------------------------------
+local cache = require("luogu.cache")
+local payload = {
+  version = cache.version,
+  updated_at = os.time(),
+  type = "P",
+  per_page = 50,
+  count = 2,
+  problems = {
+    { pid = "P1001", name = "A+B Problem", difficulty = 1, tags = {}, total_submit = 1, total_accepted = 1 },
+    { pid = "P9999", name = "x", difficulty = 0, tags = {}, total_submit = 0, total_accepted = 0 },
+  },
+}
+ok("cache saves", cache.save(payload))
+local loaded = cache.load()
+eq("cache roundtrip", loaded and #loaded.problems, 2)
+ok("cache is fresh", not cache.stale(loaded))
+ok("cache stale after ttl", cache.stale({ updated_at = os.time() - (config.get().cache_ttl + 1) }))
+ok("cache stale when missing", cache.stale(nil))
+eq("cache path", cache.path(), vim.fs.joinpath(config.data_dir(), "problem_index.json"))
+
+-- sync: a challenge stops the run, keeps progress, and resumes later
+do
+  local api_mod = require("luogu.api")
+  local real_list = api_mod.list
+  local fail_page = 4
+
+  api_mod.list = function(params, cb)
+    if params.page == fail_page then
+      return cb(nil, { msg = "洛谷反爬校验：请求太快了，稍后再试", status = 200 })
+    end
+    cb({
+      perPage = 2,
+      count = 10,
+      result = {
+        { pid = ("P%d1"):format(params.page), name = "x", difficulty = 0, tags = {}, total_submit = 0, total_accepted = 0 },
+        { pid = ("P%d2"):format(params.page), name = "y", difficulty = 0, tags = {}, total_submit = 0, total_accepted = 0 },
+      },
+    }, nil)
+  end
+
+  vim.fn.delete(cache.path())
+  local done, result, err
+  cache.sync({ type = "P" }, function(data, e)
+    result, err, done = data, e, true
+  end)
+  vim.wait(5000, function()
+    return done
+  end, 20)
+  ok(
+    "sync stops on challenge",
+    err ~= nil and err.msg:find("反爬", 1, true) ~= nil and result ~= nil and result.partial == true
+  )
+
+  local partial = cache.load()
+  ok("partial cache saved", partial ~= nil and partial.partial == true and partial.fetched_pages == 3)
+  ok("partial counts as stale", cache.stale(partial))
+
+  fail_page = -1
+  done = false
+  cache.sync({ type = "P" }, function(data, e)
+    result, err, done = data, e, true
+  end)
+  vim.wait(5000, function()
+    return done
+  end, 20)
+  ok("sync resumes", result ~= nil and err == nil and result.partial == false and #result.problems == 10)
+  ok("resumed index is fresh", not cache.stale(result))
+
+  api_mod.list = real_list
+end
 
 -- langs --------------------------------------------------------------
 local seen, unique = {}, true

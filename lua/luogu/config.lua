@@ -6,6 +6,7 @@ local defaults = {
   language = "cpp17", -- key from langs.lua
   o2 = false,
   problem_type = "P",
+  cache_ttl = 604800, -- 题库索引多久更新一次，单位秒；0 表示每次打开都更新
   http = { timeout = 30000, user_agent = "luogu.nvim/0.1" },
   keys = {
     submit = "<localleader>s",

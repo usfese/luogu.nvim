@@ -1,6 +1,7 @@
 local M = {}
 
 local http = require("luogu.http")
+local latex = require("luogu.latex")
 
 local LENTILLE = { ["x-lentille-request"] = "content-only" }
 
@@ -62,7 +63,7 @@ function M.normalize_summary(item)
   item = nn(item) or {}
   return {
     pid = nn(item.pid),
-    name = nn(item.name),
+    name = latex.clean(nn(item.name)),
     difficulty = nn(item.difficulty) or 0,
     tags = nn(item.tags) or {},
     total_submit = nn(item.totalSubmit) or 0,
@@ -92,16 +93,16 @@ function M.normalize_problem(body)
 
   return {
     pid = nn(p.pid),
-    name = nn(p.name),
+    name = latex.clean(nn(p.name)),
     difficulty = nn(p.difficulty) or 0,
     tags = nn(p.tags) or {},
     content = {
-      name = nn(content.name),
-      background = nn(content.background),
-      description = nn(content.description),
-      format_i = nn(content.formatI),
-      format_o = nn(content.formatO),
-      hint = nn(content.hint),
+      name = latex.clean(nn(content.name)),
+      background = latex.clean(nn(content.background)),
+      description = latex.clean(nn(content.description)),
+      format_i = latex.clean(nn(content.formatI)),
+      format_o = latex.clean(nn(content.formatO)),
+      hint = latex.clean(nn(content.hint)),
     },
     samples = samples,
     limits = {

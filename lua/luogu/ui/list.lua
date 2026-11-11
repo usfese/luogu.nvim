@@ -22,7 +22,15 @@ local state = {
   page = 1,
   keyword = nil,
   difficulty = nil,
-  data = nil,
+  all = nil,
+  per_page = 50,
+  updated_at = nil,
+  syncing = false,
+  sync_done = 0,
+  sync_total = 0,
+  partial = false,
+  fetched_pages = nil,
+  total_pages = nil,
   error = nil,
   tags = nil,
   tags_error = false,
@@ -125,29 +133,46 @@ local function set_keymaps(buf)
   map("p", function()
     if state.view == "menu" then
       M.open("problems")
-    elseif state.page > 1 then
-      state.page = state.page - 1
-      M.fetch()
     else
-      vim.notify("已经是第一页", LOG.INFO)
+      M.goto_page(state.page - 1)
     end
   end, "Luogu: problems / previous page")
 
+  map("h", function()
+    if state.view == "problems" then
+      M.goto_page(state.page - 1)
+    end
+  end, "Luogu: previous page")
+
   map("l", function()
-    if state.view ~= "menu" then
+    if state.view == "menu" then
+      if auth.get_cookie() ~= "" then
+        auth.logout()
+      else
+        auth.login()
+      end
+      M.render()
+    else
+      M.goto_page(state.page + 1)
+    end
+  end, "Luogu: sign in or out / next page")
+
+  map("g", function()
+    if state.view ~= "problems" then
       return
     end
-    if auth.get_cookie() ~= "" then
-      auth.logout()
-    else
-      auth.login()
-    end
-    M.render()
-  end, "Luogu: sign in or out")
+    local pages = M.page_count()
+    vim.ui.input({ prompt = ("跳到第几页 (1-%d): "):format(pages) }, function(input)
+      if not input or input == "" then
+        return
+      end
+      M.goto_page(input)
+    end)
+  end, "Luogu: go to page")
 
   map("r", function()
     if state.view == "problems" then
-      M.fetch()
+      M.refresh()
     end
   end, "Luogu: refresh")
 
@@ -158,7 +183,7 @@ local function set_keymaps(buf)
     local keyword = vim.fn.input("搜索: ", state.keyword or "")
     state.keyword = keyword ~= "" and keyword or nil
     state.page = 1
-    M.fetch()
+    M.render()
   end, "Luogu: search")
 
   map("d", function()
@@ -180,21 +205,14 @@ local function set_keymaps(buf)
       end
       state.difficulty = choice.value
       state.page = 1
-      M.fetch()
+      M.render()
     end)
   end, "Luogu: difficulty")
 
   map("n", function()
-    if state.view ~= "problems" then
-      return
+    if state.view == "problems" then
+      M.goto_page(state.page + 1)
     end
-    local count = state.data and state.data.count or 0
-    local per_page = math.max(state.data and state.data.perPage or 50, 1)
-    if state.page * per_page >= count then
-      return vim.notify("已经是最后一页", LOG.INFO)
-    end
-    state.page = state.page + 1
-    M.fetch()
   end, "Luogu: next page")
 end
 
@@ -329,11 +347,43 @@ local function render_menu(push, push_text, width)
   push(login_line())
 end
 
+local function filtered_problems()
+  local out = {}
+  local keyword = state.keyword and state.keyword ~= "" and state.keyword:lower() or nil
+  for _, problem in ipairs(state.all or {}) do
+    local keep = true
+    if keyword then
+      local name = tostring(problem.name or ""):lower()
+      local pid = tostring(problem.pid or ""):lower()
+      keep = name:find(keyword, 1, true) ~= nil or pid:find(keyword, 1, true) ~= nil
+    end
+    if keep and state.difficulty ~= nil then
+      keep = tonumber(problem.difficulty) == state.difficulty
+    end
+    if keep then
+      out[#out + 1] = problem
+    end
+  end
+  return out
+end
+
+local function page_count_for(list)
+  return math.max(1, math.ceil(#list / math.max(state.per_page, 1)))
+end
+
 local function render_problems(push, push_text, width)
-  local data = state.data
-  local count = data and data.count or 0
-  local per_page = math.max(data and data.perPage or 50, 1)
-  local pages = math.max(1, math.ceil(count / per_page))
+  local list = filtered_problems()
+  local pages = page_count_for(list)
+  if state.page > pages then
+    state.page = pages
+  end
+
+  local first = (state.page - 1) * state.per_page + 1
+  local last = math.min(#list, first + state.per_page - 1)
+  local slice = {}
+  for i = first, last do
+    slice[#slice + 1] = list[i]
+  end
 
   push(breadcrumb("Problems"))
   push_text("")
@@ -347,6 +397,10 @@ local function render_problems(push, push_text, width)
   stats:add("搜索 " .. keyword, "LuoguAlt")
   stats:add(" " .. kit.bar .. " ", "LuoguMuted")
   stats:add(("第 %d/%d 页"):format(state.page, pages), "LuoguAlt")
+  if state.syncing then
+    stats:add(" " .. kit.bar .. " ", "LuoguMuted")
+    stats:add(("同步 %d/%d"):format(state.sync_done, state.sync_total), "LuoguPending")
+  end
   push(stats)
   push_text("")
 
@@ -354,13 +408,18 @@ local function render_problems(push, push_text, width)
   local tag_w = math.max(8, math.min(24, width - PID_W - name_w - DIFF_W - RATE_W - 4))
 
   if state.error then
-    push(kit.line():add("加载失败：" .. state.error, "LuoguError"))
-  elseif not data then
-    push(kit.line():add("加载中…", "LuoguMuted"))
-  elseif #data.result == 0 then
+    push(kit.line():add(state.error, "LuoguError"))
+    push_text("")
+  end
+
+  if not state.all then
+    local text = state.syncing and ("正在同步题库 %d/%d…"):format(state.sync_done, state.sync_total)
+      or "还没有题库缓存，按 r 重试"
+    push(kit.line():add(text, "LuoguMuted"))
+  elseif #list == 0 then
     push(kit.line():add("没有找到题目", "LuoguMuted"))
   else
-    for _, problem in ipairs(data.result) do
+    for _, problem in ipairs(slice) do
       local row = push(build_problem_row(problem, name_w, tag_w))
       state.row_map[row] = {
         kind = "problem",
@@ -374,8 +433,20 @@ local function render_problems(push, push_text, width)
   push_text("")
   local footer = kit.line()
   footer:add(kit.bar .. " ", "LuoguMuted")
-  footer:add(("%d 题"):format(count), "LuoguAlt")
-  footer:add((" %s %d 条"):format(kit.bar, #(data and data.result or {})), "LuoguAlt")
+  footer:add(("%d 题"):format(#(state.all or {})), "LuoguAlt")
+  if #list ~= #(state.all or {}) then
+    footer:add((" %s 筛选 %d"):format(kit.bar, #list), "LuoguAlt")
+  end
+  footer:add((" %s 本页 %d"):format(kit.bar, #slice), "LuoguAlt")
+  if state.partial then
+    footer:add(
+      (" %s 未完整 %s/%s 页"):format(kit.bar, tostring(state.fetched_pages or "?"), tostring(state.total_pages or "?")),
+      "LuoguWarn"
+    )
+  end
+  if state.updated_at then
+    footer:add((" %s %s"):format(kit.bar, os.date("%m-%d %H:%M", state.updated_at)), "LuoguMuted")
+  end
   push(footer)
 
   local hints = kit.line()
@@ -388,9 +459,10 @@ local function render_problems(push, push_text, width)
   end
   hint("q", "返回")
   hint("<CR>", "打开")
+  hint("h/l", "翻页")
+  hint("g", "跳页")
   hint("/", "搜索")
   hint("d", "难度")
-  hint("n/p", "翻页")
   hint("r", "刷新")
   push(hints)
 end
@@ -453,34 +525,89 @@ function M.render()
   end
 end
 
-function M.fetch()
-  if state.loading then
+local cache = require("luogu.cache")
+
+local function adopt(data)
+  state.all = data.problems
+  state.per_page = data.per_page or 50
+  state.updated_at = data.updated_at
+  state.partial = data.partial == true
+  state.fetched_pages = data.fetched_pages
+  state.total_pages = data.total_pages
+  state.error = nil
+end
+
+function M.page_count()
+  return page_count_for(filtered_problems())
+end
+
+function M.goto_page(n)
+  local pages = M.page_count()
+  state.page = math.max(1, math.min(pages, tonumber(n) or 1))
+  M.render()
+end
+
+function M.sync()
+  if state.syncing then
     return
   end
-  state.loading = true
-  state.error = nil
+  state.syncing = true
+  state.sync_done, state.sync_total = 0, 0
   M.render()
 
-  local cfg = config.get()
-  api.list({
-    page = state.page,
-    keyword = state.keyword,
-    difficulty = state.difficulty,
-    type = cfg.problem_type,
+  cache.sync({
+    type = config.get().problem_type,
+    on_progress = function(done, total)
+      state.sync_done, state.sync_total = done, total
+      if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
+        M.render()
+      end
+    end,
   }, function(data, err)
-    state.loading = false
-    if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then
-      return
+    state.syncing = false
+    if data then
+      adopt(data)
     end
     if err then
-      state.data = nil
-      state.error = err.msg
+      local extra = ""
+      if data and data.partial then
+        extra = ("（已缓存 %d/%d 页，按 r 继续）"):format(data.fetched_pages, data.total_pages)
+      end
+      state.error = "题库同步中断：" .. (err.msg or "未知错误") .. extra
       return M.render()
     end
-    state.data = data
-    state.error = nil
+    state.page = 1
     M.render()
+    vim.notify(("题库缓存已更新：%d 题"):format(#data.problems), LOG.INFO)
   end)
+end
+
+function M.refresh()
+  local data = cache.load()
+  if data then
+    adopt(data)
+    M.render()
+    if cache.stale(data) then
+      M.sync()
+    end
+  else
+    M.sync()
+  end
+end
+
+local function ensure_loaded()
+  if state.all then
+    return
+  end
+  local data = cache.load()
+  if data then
+    adopt(data)
+    if cache.stale(data) then
+      M.sync()
+    end
+  else
+    M.sync()
+  end
 end
 
 local function ensure_tags()
@@ -511,9 +638,8 @@ function M.open(view)
 
   if state.view == "problems" then
     ensure_tags()
-    if not state.data and not state.loading then
-      M.fetch()
-    end
+    ensure_loaded()
+    M.render()
   end
 end
 
@@ -540,8 +666,8 @@ function M.reopen()
   ensure_tab()
   ensure_popup()
   M.render()
-  if state.view == "problems" and not state.data and not state.loading then
-    M.fetch()
+  if state.view == "problems" then
+    ensure_loaded()
   end
 end
 
@@ -601,7 +727,7 @@ end
 
 ---@return table|nil
 function M.get_data()
-  return state.data
+  return { result = state.all or {} }
 end
 
 M.state = state
