@@ -24,13 +24,16 @@
 
 ```lua
 require("luogu").setup({
-  data_dir = vim.fn.stdpath("data") .. "/luogu.nvim", -- cookie 和代码文件放这里
+  data_dir = vim.fn.stdpath("data") .. "/luogu.nvim", -- cookie、题库索引、代码文件放这里
   cookie = "",          -- 完整的 Cookie 头，非空时优先于 data_dir/cookie
   language = "cpp17",   -- 见下面「语言」
   o2 = false,           -- 只对支持 O2 的语言生效
   problem_type = "P",   -- P 是主题库
   cache_ttl = 604800,   -- 题库索引多久更新一次（秒），0 表示每次都更新
-  http = { timeout = 30000, user_agent = "luogu.nvim/0.1" },
+  http = {
+    timeout = 30000,
+    user_agent = "Mozilla/5.0 ... Chrome/130.0 Safari/537.36 luogu.nvim/0.1",
+  },
   keys = {
     submit = "<localleader>s",
     language = "<localleader>l",
