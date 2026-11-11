@@ -145,8 +145,11 @@ local function show(problem)
   local tags = api.tags_cached()
   local desc_buf = create_desc(problem, tags and tags.by_id or nil)
 
-  local in_list = vim.b[vim.api.nvim_get_current_buf()] and vim.b[vim.api.nvim_get_current_buf()].luogu_list
-  if not in_list then
+  local cur_buf = vim.api.nvim_get_current_buf()
+  local in_list = vim.b[cur_buf] and vim.b[cur_buf].luogu_list
+  -- Splitting the only window of the only tab would make `:q` quit Neovim, so
+  -- give the view its own tab in that case. Otherwise split where we are.
+  if not in_list and #vim.api.nvim_tabpage_list_wins(0) == 1 and #vim.api.nvim_list_tabpages() == 1 then
     vim.cmd("tabnew")
   end
 

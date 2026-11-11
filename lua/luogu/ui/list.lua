@@ -13,8 +13,7 @@ local TAG_W = 20
 local state = {
   buf = nil,
   win = nil,
-  prev_buf = nil,
-  opened_tab = false,
+  prev_tab = nil,
   page = 1,
   keyword = nil,
   difficulty = nil,
@@ -228,28 +227,30 @@ local function ensure_tags()
 end
 
 function M.close()
-  local buf = state.buf
-  local opened_tab = state.opened_tab
-  local prev = state.prev_buf
+  local buf, win, prev_tab = state.buf, state.win, state.prev_tab
 
   state.buf = nil
   state.win = nil
-  state.prev_buf = nil
-  state.opened_tab = false
+  state.prev_tab = nil
 
-  if opened_tab then
-    pcall(vim.cmd, "tabclose")
-  else
-    local cur_win = vim.api.nvim_get_current_win()
-    if prev and vim.api.nvim_buf_is_valid(prev) and buf and vim.api.nvim_win_get_buf(cur_win) == buf then
-      pcall(vim.api.nvim_win_set_buf, cur_win, prev)
-    elseif buf and vim.api.nvim_win_get_buf(cur_win) == buf then
-      pcall(vim.cmd, "enew")
+  if win and vim.api.nvim_win_is_valid(win) then
+    local tab = vim.api.nvim_win_get_tabpage(win)
+    local wins = vim.api.nvim_tabpage_list_wins(tab)
+    if #wins == 1 and #vim.api.nvim_list_tabpages() == 1 then
+      -- Last window of the last tab: closing it would quit Neovim. Swap the
+      -- buffer out instead, so the window survives.
+      pcall(vim.api.nvim_win_set_buf, win, vim.api.nvim_create_buf(true, false))
+    else
+      pcall(vim.api.nvim_win_close, win, true)
     end
   end
 
   if buf and vim.api.nvim_buf_is_valid(buf) then
     pcall(vim.api.nvim_buf_delete, buf, { force = true })
+  end
+
+  if prev_tab and vim.api.nvim_tabpage_is_valid(prev_tab) then
+    pcall(vim.api.nvim_set_current_tabpage, prev_tab)
   end
 end
 
@@ -341,19 +342,12 @@ function M.open()
         return
       end
     end
-    state.buf = nil
-    state.win = nil
+    state.buf, state.win = nil, nil
   end
 
-  local cur_buf = vim.api.nvim_get_current_buf()
-  if vim.bo[cur_buf].modified and vim.bo[cur_buf].buftype == "" then
-    vim.cmd("tabnew")
-    state.opened_tab = true
-    state.prev_buf = nil
-  else
-    state.opened_tab = false
-    state.prev_buf = cur_buf
-  end
+  -- Own tab, so `:q` can only close this tab and falls back to the user's one.
+  local prev_tab = vim.api.nvim_get_current_tabpage()
+  vim.cmd("tabnew")
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].buftype = "nofile"
@@ -366,6 +360,7 @@ function M.open()
   vim.api.nvim_win_set_buf(0, buf)
   state.buf = buf
   state.win = vim.api.nvim_get_current_win()
+  state.prev_tab = prev_tab
   pcall(vim.api.nvim_set_option_value, "wrap", false, { win = state.win })
   pcall(vim.api.nvim_set_option_value, "number", false, { win = state.win })
   pcall(vim.api.nvim_set_option_value, "relativenumber", false, { win = state.win })
@@ -377,6 +372,7 @@ function M.open()
       if state.buf == buf then
         state.buf = nil
         state.win = nil
+        state.prev_tab = nil
       end
     end,
   })

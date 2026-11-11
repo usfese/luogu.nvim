@@ -83,6 +83,8 @@ end
 print("tags ok")
 
 -- 4. list UI + problem UI ---------------------------------------------
+local tabs_before = #vim.api.nvim_list_tabpages()
+local base_buf = vim.api.nvim_get_current_buf()
 ui_list.open()
 wait_for(function()
   local buf = ui_list.state.buf
@@ -104,6 +106,13 @@ if not list_lines[1]:find("题库", 1, true) then
 end
 if not list_lines[4] or list_lines[4]:sub(1, 5) ~= "P1000" then
   fail("first row is not P1000: " .. tostring(list_lines[4]))
+end
+if #vim.api.nvim_list_tabpages() ~= tabs_before + 1 then
+  fail("list did not open in its own tab")
+end
+local list_win = vim.fn.bufwinid(list_buf)
+if #vim.api.nvim_tabpage_list_wins(vim.api.nvim_win_get_tabpage(list_win)) ~= 1 then
+  fail("list tab has other windows")
 end
 
 ui_problem.open("P1001")
@@ -139,7 +148,31 @@ local code_path = vim.api.nvim_buf_get_name(code_buf)
 if not code_path:match("problems/P1001%.cpp$") then
   fail("unexpected code path: " .. code_path)
 end
+
+local code_win = vim.fn.bufwinid(code_buf)
+local desc_win = vim.fn.bufwinid(desc_buf)
+local plugin_tab = vim.api.nvim_win_get_tabpage(code_win)
+if #vim.api.nvim_tabpage_list_wins(plugin_tab) ~= 2 then
+  fail("expected statement and code side by side")
+end
+if vim.api.nvim_win_get_tabpage(desc_win) ~= plugin_tab then
+  fail("statement and code are in different tabs")
+end
 print("UI ok")
+
+-- closing the plugin views must never take the last window of the last tab
+vim.api.nvim_win_close(desc_win, true)
+if not vim.api.nvim_win_is_valid(code_win) then
+  fail("closing the statement closed the code window too")
+end
+vim.api.nvim_win_close(code_win, true)
+if #vim.api.nvim_list_tabpages() ~= tabs_before then
+  fail("plugin tab did not close")
+end
+if vim.api.nvim_get_current_buf() ~= base_buf then
+  fail("did not fall back to the previous buffer")
+end
+print("tabs ok")
 
 -- 5. invalid cookie ---------------------------------------------------
 local cookie_res, cookie_err
