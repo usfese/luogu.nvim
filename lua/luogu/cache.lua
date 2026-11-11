@@ -83,10 +83,6 @@ function M.stale(data)
   return (os.time() - (tonumber(data.updated_at) or 0)) >= ttl
 end
 
-function M.is_syncing()
-  return running
-end
-
 local function is_block(err)
   local msg = tostring(err and err.msg or "")
   return msg:find("反爬", 1, true) ~= nil or (err ~= nil and err.status == 429)
