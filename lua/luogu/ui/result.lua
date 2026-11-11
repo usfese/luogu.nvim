@@ -7,7 +7,7 @@ local status = require("luogu.status")
 local LOG = vim.log.levels
 local MAX_ATTEMPTS = 180
 local INTERVAL = 1000
-local HEIGHT = 20
+local HEIGHT = 18
 
 local ns = vim.api.nvim_create_namespace("luogu.result")
 
@@ -85,7 +85,7 @@ function M.open(rid)
     relative = "editor",
     width = width,
     height = HEIGHT,
-    row = math.max(0, math.floor((vim.o.lines - HEIGHT) / 2)),
+    row = math.max(0, vim.o.lines - HEIGHT - 4),
     col = math.max(0, math.floor((vim.o.columns - width) / 2)),
     style = "minimal",
     border = "rounded",

@@ -13,7 +13,7 @@ function M.open(pid)
 end
 
 function M.list()
-  require("luogu.ui.list").open()
+  require("luogu.ui.list").open("problems")
 end
 
 ---@param pid string|nil

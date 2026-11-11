@@ -158,11 +158,13 @@ local function show(problem)
   local tags = api.tags_cached()
   local desc_buf = create_desc(problem, tags and tags.by_id or nil)
 
-  local cur_buf = vim.api.nvim_get_current_buf()
-  local in_list = vim.b[cur_buf] and vim.b[cur_buf].luogu_list
+  local list_ui = require("luogu.ui.list")
   -- Splitting the only window of the only tab would make `:q` quit Neovim, so
   -- give the view its own tab in that case. Otherwise split where we are.
-  if not in_list and #vim.api.nvim_tabpage_list_wins(0) == 1 and #vim.api.nvim_list_tabpages() == 1 then
+  if not list_ui.current_tab()
+    and #vim.api.nvim_tabpage_list_wins(0) == 1
+    and #vim.api.nvim_list_tabpages() == 1
+  then
     vim.cmd("tabnew")
   end
 
@@ -178,6 +180,18 @@ local function show(problem)
   set_desc_window_opts(desc_win)
 
   vim.api.nvim_set_current_win(code_win)
+
+  vim.api.nvim_create_autocmd("WinClosed", {
+    pattern = tostring(code_win),
+    once = true,
+    callback = function()
+      vim.schedule(function()
+        if list_ui.should_return() then
+          list_ui.reopen()
+        end
+      end)
+    end,
+  })
 
   set_code_keymaps(code_buf, pid)
   set_desc_keymaps(desc_buf, pid)
@@ -223,9 +237,13 @@ local function show(problem)
 end
 
 ---@param pid string
-function M.open(pid)
+---@param opts table|nil { on_error = fun() }
+function M.open(pid, opts)
   pid = tostring(pid or "")
   if not pid:match("^[%w_]+$") or #pid > 32 then
+    if opts and opts.on_error then
+      opts.on_error()
+    end
     return notify_err("非法题目 ID")
   end
 
@@ -245,6 +263,9 @@ function M.open(pid)
   vim.notify("正在加载 " .. pid .. "…", LOG.INFO)
   api.problem(pid, function(problem, err)
     if not problem then
+      if opts and opts.on_error then
+        opts.on_error()
+      end
       return notify_err(err and err.msg or "加载失败")
     end
     show(problem)

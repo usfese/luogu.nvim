@@ -85,14 +85,28 @@ print("tags ok")
 -- 4. list UI + problem UI ---------------------------------------------
 local tabs_before = #vim.api.nvim_list_tabpages()
 local base_buf = vim.api.nvim_get_current_buf()
-ui_list.open()
+
+ui_list.open("menu")
+if ui_list.state.view ~= "menu" then
+  fail("menu page is not active")
+end
+local menu_text = table.concat(vim.api.nvim_buf_get_lines(ui_list.state.buf, 0, -1, false), "\n")
+if not menu_text:find("Problems", 1, true) or not menu_text:find("Close", 1, true) then
+  fail("menu buttons missing")
+end
+if vim.api.nvim_win_get_config(ui_list.state.win).relative ~= "editor" then
+  fail("menu is not a floating window")
+end
+print("menu ok")
+
+ui_list.open("problems")
 wait_for(function()
   local buf = ui_list.state.buf
   if not (buf and vim.api.nvim_buf_is_valid(buf)) then
     return false
   end
   for _, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
-    if line:find("P1000", 1, true) then
+    if line:sub(1, 5) == "P1000" then
       return true
     end
   end
@@ -100,32 +114,20 @@ wait_for(function()
 end, "list buffer with P1000")
 
 local list_buf = ui_list.state.buf
+local list_win = ui_list.state.win
+if not (list_win and vim.api.nvim_win_is_valid(list_win)) then
+  fail("list window missing")
+end
+if vim.api.nvim_win_get_config(list_win).relative ~= "editor" then
+  fail("list is not a floating window")
+end
 local list_lines = vim.api.nvim_buf_get_lines(list_buf, 0, -1, false)
 if not table.concat(list_lines, "\n"):find("Problems", 1, true) then
   fail("list breadcrumb missing")
 end
-local row_index
-for i, line in ipairs(list_lines) do
-  if line:sub(1, 5) == "P1000" then
-    row_index = i
-    break
-  end
-end
-if not row_index then
-  fail("P1000 row missing from the list")
-end
-if row_index < 6 then
-  fail("P1000 row appeared before the header block")
-end
-if #vim.api.nvim_list_tabpages() ~= tabs_before + 1 then
-  fail("list did not open in its own tab")
-end
-local list_win = vim.fn.bufwinid(list_buf)
-if #vim.api.nvim_tabpage_list_wins(vim.api.nvim_win_get_tabpage(list_win)) ~= 1 then
-  fail("list tab has other windows")
-end
 
-ui_problem.open("P1001")
+local data_before = ui_list.state.data
+ui_list.open_problem("P1001")
 
 local code_buf, desc_buf
 wait_for(function()
@@ -144,41 +146,47 @@ wait_for(function()
 end, "problem buffers")
 
 local desc_text = table.concat(vim.api.nvim_buf_get_lines(desc_buf, 0, -1, false), "\n")
-if not desc_text:find("A+B Problem", 1, true) then
-  fail("description buffer missing problem name")
+if not desc_text:find("P1001. A+B Problem", 1, true) then
+  fail("description header missing title")
 end
-if not desc_text:find("## 题目描述", 1, true) then
+if desc_text:find("## 题目描述", 1, true) == nil then
   fail("description buffer missing markdown section")
 end
 if desc_text:find("入门", 1, true) == nil or desc_text:find("模拟", 1, true) == nil then
   fail("description header missing difficulty or tag name")
-end
-if desc_text:find("P1001. A+B Problem", 1, true) == nil then
-  fail("description header missing title")
 end
 
 local code_path = vim.api.nvim_buf_get_name(code_buf)
 if not code_path:match("problems/P1001%.cpp$") then
   fail("unexpected code path: " .. code_path)
 end
+print("UI ok")
 
 local code_win = vim.fn.bufwinid(code_buf)
 local desc_win = vim.fn.bufwinid(desc_buf)
-local plugin_tab = vim.api.nvim_win_get_tabpage(code_win)
-if #vim.api.nvim_tabpage_list_wins(plugin_tab) ~= 2 then
-  fail("expected statement and code side by side")
+if code_win < 0 or desc_win < 0 then
+  fail("problem windows missing")
 end
-if vim.api.nvim_win_get_tabpage(desc_win) ~= plugin_tab then
-  fail("statement and code are in different tabs")
-end
-print("UI ok")
 
--- closing the plugin views must never take the last window of the last tab
 vim.api.nvim_win_close(desc_win, true)
 if not vim.api.nvim_win_is_valid(code_win) then
   fail("closing the statement closed the code window too")
 end
+
+-- closing the code window returns to the list popup, not the home tab
 vim.api.nvim_win_close(code_win, true)
+wait_for(function()
+  return ui_list.state.win ~= nil and vim.api.nvim_win_is_valid(ui_list.state.win)
+end, "list restored after closing the problem")
+if ui_list.state.data ~= data_before then
+  fail("list was refetched instead of reused")
+end
+if #vim.api.nvim_list_tabpages() ~= tabs_before + 1 then
+  fail("problem view did not stay in the plugin tab")
+end
+print("stack ok")
+
+ui_list.close()
 if #vim.api.nvim_list_tabpages() ~= tabs_before then
   fail("plugin tab did not close")
 end

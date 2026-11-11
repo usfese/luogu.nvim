@@ -15,11 +15,11 @@ function M.run(fargs)
   local sub = fargs[1]
 
   if not sub or sub == "" then
-    return require("luogu.ui.list").open()
+    return require("luogu.ui.list").open("menu")
   end
 
   if sub == "list" then
-    return require("luogu.ui.list").open()
+    return require("luogu.ui.list").open("problems")
   elseif sub == "open" then
     if not fargs[2] or fargs[2] == "" then
       return err(USAGE)
