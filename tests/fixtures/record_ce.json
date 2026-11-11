@@ -1,0 +1,22 @@
+{
+  "data": {
+    "showStatus": true,
+    "record": {
+      "id": 124,
+      "status": 2,
+      "score": 0,
+      "time": 0,
+      "memory": 0,
+      "language": 12,
+      "enableO2": false,
+      "detail": {
+        "compileResult": {
+          "success": false,
+          "message": "\u001b[31merror:\u001b[0m expected ';'",
+          "opt2": false
+        },
+        "judgeResult": null
+      }
+    }
+  }
+}

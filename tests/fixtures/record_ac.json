@@ -1,0 +1,33 @@
+{
+  "currentData": {
+    "showStatus": true,
+    "record": {
+      "id": 123,
+      "status": 12,
+      "score": 100,
+      "time": 23,
+      "memory": 1024,
+      "language": 12,
+      "enableO2": false,
+      "detail": {
+        "compileResult": {
+          "success": true,
+          "message": null,
+          "opt2": false
+        },
+        "judgeResult": {
+          "subtasks": [
+            {
+              "id": 1,
+              "score": 100,
+              "status": 12,
+              "time": 23,
+              "memory": 1024,
+              "testCases": []
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# user credentials and generated files (never commit)
+cookie
+data/
+
+# editor / OS noise
+*.log
+*.swp
+.DS_Store

@@ -1,0 +1,111 @@
+{
+  "instance": "main",
+  "template": "problem",
+  "status": 200,
+  "locale": "zh-CN",
+  "data": {
+    "problem": {
+      "pid": "P1001",
+      "type": "P",
+      "name": "A+B Problem",
+      "difficulty": 1,
+      "fullScore": 100,
+      "tags": [
+        1
+      ],
+      "totalSubmit": 2282519,
+      "totalAccepted": 1321506,
+      "flag": 5,
+      "provider": {
+        "uid": 3,
+        "name": "洛谷"
+      },
+      "content": {
+        "name": "A+B Problem",
+        "background": "样例背景文本。",
+        "description": "输入两个整数，输出它们的和。",
+        "formatI": "一行两个整数。",
+        "formatO": "一个整数。",
+        "hint": "样例提示文本。",
+        "locale": "zh-CN"
+      },
+      "samples": [
+        [
+          "20 30\n",
+          "50\n"
+        ]
+      ],
+      "limits": {
+        "time": [
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000
+        ],
+        "memory": [
+          524288,
+          524288,
+          524288,
+          524288,
+          524288,
+          524288,
+          524288,
+          524288,
+          524288,
+          524288
+        ]
+      },
+      "acceptLanguages": [
+        5,
+        1,
+        2,
+        28,
+        3,
+        4,
+        11,
+        12,
+        27,
+        34,
+        7,
+        25,
+        8,
+        33,
+        15,
+        14,
+        19,
+        30,
+        31,
+        32,
+        21,
+        22,
+        17,
+        9,
+        16,
+        13,
+        23
+      ]
+    },
+    "translations": {},
+    "bookmarked": false,
+    "contest": null,
+    "contestProblems": null,
+    "contestOrigin": null,
+    "vjudgeUsername": null,
+    "lastLanguage": null,
+    "lastCode": "",
+    "lastCodeAt": null,
+    "recommendations": {},
+    "forum": {},
+    "discussions": [],
+    "locale": "zh-CN",
+    "canEdit": false
+  },
+  "user": null,
+  "time": 1794360920.9
+}

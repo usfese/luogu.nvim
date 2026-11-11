@@ -1,0 +1,70 @@
+{
+  "instance": "main",
+  "template": "problem/list",
+  "status": 200,
+  "locale": "zh-CN",
+  "data": {
+    "problems": {
+      "perPage": 50,
+      "count": 16728,
+      "result": [
+        {
+          "pid": "P1000",
+          "type": "P",
+          "name": "超级玛丽游戏",
+          "difficulty": 1,
+          "fullScore": 100,
+          "tags": [
+            2,
+            108
+          ],
+          "totalSubmit": 1930803,
+          "totalAccepted": 735696,
+          "flag": 5,
+          "provider": {
+            "uid": 3,
+            "name": "洛谷"
+          }
+        },
+        {
+          "pid": "P1001",
+          "type": "P",
+          "name": "A+B Problem",
+          "difficulty": 1,
+          "fullScore": 100,
+          "tags": [
+            1
+          ],
+          "totalSubmit": 2282519,
+          "totalAccepted": 1321506,
+          "flag": 5,
+          "provider": {
+            "uid": 3,
+            "name": "洛谷"
+          }
+        },
+        {
+          "pid": "P1002",
+          "type": "P",
+          "name": "[NOIP 2002 普及组] 过河卒",
+          "difficulty": 2,
+          "fullScore": 100,
+          "tags": [
+            3,
+            108
+          ],
+          "totalSubmit": 812345,
+          "totalAccepted": 249480,
+          "flag": 5,
+          "provider": {
+            "uid": 3,
+            "name": "洛谷"
+          }
+        }
+      ]
+    },
+    "filter": {}
+  },
+  "user": null,
+  "time": 1794360920.9
+}

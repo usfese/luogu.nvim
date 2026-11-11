@@ -1,0 +1,72 @@
+{
+  "tags": [
+    {
+      "id": -2,
+      "name": "语言入门",
+      "type": 2,
+      "parent": null
+    },
+    {
+      "id": 1,
+      "name": "模拟",
+      "type": 2,
+      "parent": 110
+    },
+    {
+      "id": 2,
+      "name": "字符串",
+      "type": 2,
+      "parent": null
+    },
+    {
+      "id": 110,
+      "name": "其他",
+      "type": 2,
+      "parent": null
+    },
+    {
+      "id": 108,
+      "name": "O2优化",
+      "type": 2,
+      "parent": null
+    },
+    {
+      "id": 3,
+      "name": "动态规划 DP",
+      "type": 2,
+      "parent": null
+    }
+  ],
+  "types": [
+    {
+      "id": 1,
+      "type": "Region",
+      "name": "区域",
+      "color": "green-3",
+      "order": 4
+    },
+    {
+      "id": 2,
+      "type": "Algorithm",
+      "name": "算法",
+      "color": "lapis-3",
+      "order": 1
+    },
+    {
+      "id": 3,
+      "type": "Origin",
+      "name": "来源",
+      "color": "orange-3",
+      "order": 2
+    },
+    {
+      "id": 4,
+      "type": "Special",
+      "name": "特殊",
+      "color": "purple-3",
+      "order": 3
+    }
+  ],
+  "_locale": "zh-CN",
+  "_version": 1
+}
