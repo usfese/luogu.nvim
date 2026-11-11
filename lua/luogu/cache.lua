@@ -5,7 +5,7 @@ local config = require("luogu.config")
 
 local VERSION = 1
 local CONCURRENCY = 1
-local DELAY = 400
+local DELAY = 250
 local RETRIES = 2
 
 local running = false
@@ -154,7 +154,7 @@ function M.sync(opts, cb)
       count = #problems,
       problems = problems,
       partial = partial,
-      fetched_pages = pages_done,
+      fetched_pages = math.min(pages_done, total),
       total_pages = total,
     }
   end
@@ -214,6 +214,11 @@ function M.sync(opts, cb)
       remaining = remaining - 1
       progress()
 
+      -- Keep progress across restarts: this run can take minutes.
+      if pages_done % 30 == 0 and pages_done < total then
+        M.save(snapshot(true))
+      end
+
       if remaining <= 0 then
         finish()
       else
@@ -246,6 +251,9 @@ function M.sync(opts, cb)
     pages_done = pages_done + 1
     server_per_page = data.perPage or 50
     total = math.max(1, math.ceil((data.count or #data.result) / math.max(server_per_page, 1)))
+    if pages_done > total then
+      pages_done = total
+    end
     progress()
 
     if start_page >= total then
