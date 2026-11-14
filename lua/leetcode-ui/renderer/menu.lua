@@ -1,5 +1,4 @@
 local log = require("leetcode.logger")
-local cookie = require("leetcode.cache.cookie")
 local config = require("leetcode.config")
 local ui_utils = require("leetcode-ui.utils")
 local utils = require("leetcode.utils")
@@ -185,22 +184,7 @@ function Menu:remount()
 end
 
 function Menu:mount()
-    if cookie.get() then
-        self:set_page("loading")
-
-        local auth_api = require("leetcode.api.auth")
-        auth_api.user(function(_, err)
-            if err then
-                self:set_page("signin")
-                log.err(err)
-            else
-                local cmd = require("leetcode.command")
-                cmd.start_user_session()
-            end
-        end)
-    else
-        self:set_page("signin")
-    end
+    self:set_page("menu")
 
     self:_mount()
 

@@ -261,7 +261,6 @@ end
 
 function cmd.q_run()
     local utils = require("leetcode.utils")
-    utils.auth_guard()
     local q = utils.curr_question()
     if q then
         q.console:run()
@@ -270,7 +269,6 @@ end
 
 function cmd.q_submit()
     local utils = require("leetcode.utils")
-    utils.auth_guard()
     local q = utils.curr_question()
     if q then
         q.console:run(true)

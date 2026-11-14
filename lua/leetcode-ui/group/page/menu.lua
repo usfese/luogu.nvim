@@ -24,15 +24,6 @@ local problems = Button("Problems", {
     expandable = true,
 })
 
-local statistics = Button("Statistics", {
-    icon = "󰄪",
-    sc = "s",
-    on_press = function()
-        cmd.set_menu_page("stats")
-    end,
-    expandable = true,
-})
-
 local cookie = Button("Cookie", {
     icon = "󰆘",
     sc = "i",
@@ -42,22 +33,12 @@ local cookie = Button("Cookie", {
     expandable = true,
 })
 
-local cache = Button("Cache", {
-    icon = "",
-    sc = "c",
-    on_press = function()
-        cmd.set_menu_page("cache")
-    end,
-    expandable = true,
-})
 
 local exit = ExitButton()
 
 page:insert(Buttons({
     problems,
-    statistics,
     cookie,
-    cache,
     exit,
 }))
 

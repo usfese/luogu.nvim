@@ -307,8 +307,15 @@ end
 function Question:handle_mount()
     self:create_buffer()
 
-    self.description = Description(self):mount()
+    self.description = Description(self)
+    if self.luogu_description then
+        self.description.populate = self.luogu_description
+    end
+    self.description:mount()
     self.console = Console(self)
+    if self.luogu_run then
+        self.console.run = self.luogu_run
+    end
     self.info = Info(self)
 
     table.insert(_Lc_state.questions, self)

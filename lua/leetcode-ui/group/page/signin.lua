@@ -1,5 +1,4 @@
-local cmd = require("leetcode.command")
-local config = require("leetcode.config")
+local list = require("luogu.list")
 
 local Page = require("leetcode-ui.group.page")
 local Title = require("leetcode-ui.lines.title")
@@ -19,7 +18,7 @@ page:insert(Title({}, "Sign in"))
 local problems = Button("Sign in (By Cookie)", {
     icon = "󱛖",
     sc = "s",
-    on_press = cmd.cookie_prompt,
+    on_press = list.cookie_prompt,
 })
 
 local exit = ExitButton()
@@ -32,7 +31,7 @@ page:insert(Buttons({
 local footer = Group({}, {
     hl = "Number",
 })
-footer:append("leetcode." .. config.domain)
+footer:append("luogu.com.cn")
 page:insert(footer)
 
 return page

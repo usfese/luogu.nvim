@@ -1,4 +1,4 @@
-local cmd = require("leetcode.command")
+local list = require("luogu.list")
 
 local Title = require("leetcode-ui.lines.title")
 local Button = require("leetcode-ui.lines.button.menu")
@@ -15,30 +15,16 @@ page:insert(header)
 
 page:insert(Title({ "Menu" }, "Problems"))
 
-local list = Button("List", {
+local problems = Button("List", {
     icon = "",
     sc = "p",
-    on_press = cmd.problems,
-})
-
-local random = Button("Random", {
-    icon = "",
-    sc = "r",
-    on_press = cmd.random_question,
-})
-
-local daily = Button("Daily", {
-    icon = "󰃭",
-    sc = "d",
-    on_press = cmd.qot,
+    on_press = list.open,
 })
 
 local back = BackButton("menu")
 
 page:insert(Buttons({
-    list,
-    random,
-    daily,
+    problems,
     back,
 }))
 

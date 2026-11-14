@@ -1,4 +1,4 @@
-local cmd = require("leetcode.command")
+local list = require("luogu.list")
 
 local Title = require("leetcode-ui.lines.title")
 local Buttons = require("leetcode-ui.group.buttons.menu")
@@ -18,13 +18,16 @@ page:insert(Title({ "Menu" }, "Cookie"))
 local update = Button("Update", {
     icon = "󱛬",
     sc = "u",
-    on_press = cmd.cookie_prompt,
+    on_press = list.cookie_prompt,
 })
 
 local delete = Button("Delete / Sign out", {
     icon = "󱛪",
     sc = "d",
-    on_press = cmd.sign_out,
+    on_press = function()
+        require("luogu.client").logout()
+        vim.notify("已退出洛谷登录", vim.log.levels.INFO, { title = "洛谷" })
+    end,
 })
 
 local back = BackButton("menu")
