@@ -8,13 +8,13 @@
 - `curl`
 - `nvim-lua/plenary.nvim`
 - `MunifTanjim/nui.nvim`
-- 选择器（如 `nvim-telescope/telescope.nvim` 或 `ibhagwan/fzf-lua`）
+- `nvim-telescope/telescope.nvim`
 
 ## 安装
 
 ```lua
 {
-  dir = "/home/usfese/Workspace/luogu.nvim",
+  "usfese/luogu.nvim",
   cmd = "Luogu",
   dependencies = {
     "nvim-lua/plenary.nvim",
