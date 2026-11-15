@@ -135,7 +135,9 @@ function Question:open_buffer(existed)
     ui_utils.buf_set_opts(self.bufnr, { buflisted = true })
     ui_utils.win_set_buf(self.winid, self.bufnr, true)
 
-    vim.cmd([[match DiagnosticHint /@leet/]])
+    if not self.luogu_problem then
+        vim.cmd([[match DiagnosticHint /@leet/]])
+    end
 
     if config.user.editor.fold_imports then
         self:editor_fold_imports(false)

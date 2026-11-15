@@ -104,6 +104,9 @@ function M.open()
     picker = pickers.new(theme, {
         prompt_title = "搜索洛谷题库",
         finder = finder(),
+        -- Telescope only navigates within temp__scrolling_limit rows (default 250).
+        -- Cover the full Luogu index (~17k problems) so scrolling reaches the end.
+        temp__scrolling_limit = 20000,
         sorter = conf.generic_sorter(theme),
         selection_strategy = "follow",
         on_input_filter_cb = function(value)

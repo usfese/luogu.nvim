@@ -18,27 +18,9 @@ end
 local function describe(description)
     local problem = description.question.luogu_problem
     local group = Group()
-    append_lines(group, problem.pid .. "  " .. problem.name)
-    append_lines(group, "https://www.luogu.com.cn/problem/" .. problem.pid)
-    local content = problem.content or {}
-    for _, section in ipairs({
-        { "题目背景", content.background },
-        { "题目描述", content.description },
-        { "输入格式", content.formatI },
-        { "输出格式", content.formatO },
-    }) do
-        if section[2] and section[2] ~= "" then
-            append_lines(group, "\n## " .. section[1] .. "\n" .. section[2])
-        end
-    end
-    for i, sample in ipairs(problem.samples or {}) do
-        append_lines(group, ("\n## 样例 %d\n输入:\n%s\n输出:\n%s"):format(i, sample[1] or "", sample[2] or ""))
-    end
-    if content.hint and content.hint ~= "" then
-        append_lines(group, "\n## 说明/提示\n" .. content.hint)
-    end
-    if problem.limits and not vim.tbl_isempty(problem.limits) then
-        append_lines(group, "\n## 限制\n" .. vim.inspect(problem.limits))
+    for _, line in ipairs(require("luogu.markdown").document(problem)) do
+        group:append(line)
+        group:endl()
     end
     description.renderer:replace({ group })
 end
@@ -84,10 +66,6 @@ local function run(console, submit)
     end
     local question = console.question
     local code = question:editor_submit_lines(true)
-    local imports = question:editor_section_range("imports")
-    if imports.complete then
-        code = table.concat(imports.lines, "\n", imports.start_i, imports.end_i) .. "\n" .. code
-    end
     console:show()
     console.result:focus()
     show_result(console, "正在提交…")
@@ -148,6 +126,24 @@ function M.open(pid)
                 similar = {},
                 topic_tags = {},
             }
+            question.injector = function(_, code)
+                return code
+            end
+            question.editor_submit_lines = function(self)
+                return table.concat(vim.api.nvim_buf_get_lines(self.bufnr, 0, -1, false), "\n")
+            end
+            local open_buffer = question.open_buffer
+            question.open_buffer = function(self, existed)
+                open_buffer(self, existed)
+                local lines = vim.api.nvim_buf_get_lines(self.bufnr, 0, -1, false)
+                local clean = vim.tbl_filter(function(line)
+                    local marker = line:match("@leet.*start") or line:match("@leet.*end")
+                    return not marker
+                end, lines)
+                if #clean ~= #lines then
+                    vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, clean)
+                end
+            end
             question:handle_mount()
         end)
     end)
